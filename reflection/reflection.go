@@ -10,11 +10,13 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/naming"
 	pb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 )
 
 var (
 	useTls      = flag.Bool("use_tls", true, "Use TLS")
+	useLb       = flag.Bool("use_lb", true, "Use GRPC naming / GRPCLB resolution")
 	tlsUserCert = flag.String("tls_user_crt", "$HOME/.grpc-ui/user.crt", "TLS client certificate to use")
 	tlsUserKey  = flag.String("tls_user_key", "$HOME/.grpc-ui/user.key", "TLS client certificate key to use")
 )
@@ -24,11 +26,14 @@ type Reflection struct {
 	FileDescriptors [][]byte
 }
 
-func grpcTransportCredentials() grpc.DialOption {
+func grpcTransportCredentials(server string) grpc.DialOption {
 	if !*useTls {
 		return grpc.WithInsecure()
 	}
 	tc := tls.Config{}
+	if *useLb {
+		tc.ServerName = server
+	}
 	cert, err := tls.LoadX509KeyPair(os.ExpandEnv(*tlsUserCert), os.ExpandEnv(*tlsUserKey))
 	if err != nil {
 		log.Printf("unable to load client certificate, proceeding without")
@@ -40,11 +45,44 @@ func grpcTransportCredentials() grpc.DialOption {
 	)
 }
 
+func dialContext(ctx context.Context, addr string) (*grpc.ClientConn, error) {
+	creds := grpcTransportCredentials(addr)
+	if !*useLb {
+		conn, err := grpc.DialContext(ctx, addr, creds)
+		return conn, err
+	}
+
+        resolver, err := naming.NewDNSResolver()
+        if err != nil {
+                log.Fatalf("unable to create resolver: %v", err)
+        }
+        watcher, err := resolver.Resolve(addr)
+        if err != nil {
+		return nil, err
+        }
+        targets, err := watcher.Next()
+        if err != nil {
+		return nil, err
+        }
+
+        var conn *grpc.ClientConn
+        for _, target := range targets {
+                var err error
+                conn, err = grpc.Dial(target.Addr, creds)
+                if err != nil {
+                        log.Printf("could not connect to %s: %v", target.Addr, err)
+                        conn = nil
+                }
+		return conn, nil
+        }
+	return nil, errors.New("no alive backends")
+}
+
 func GetReflection(ctx context.Context, addr string) (*Reflection, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr, grpcTransportCredentials())
+	conn, err := dialContext(ctx, addr)
 
 	if err != nil {
 		return nil, err
@@ -156,7 +194,7 @@ func Invoke(
 	method string,
 	payload []byte,
 ) ([]byte, error) {
-	conn, err := grpc.DialContext(ctx, addr, grpcTransportCredentials())
+	conn, err := dialContext(ctx, addr)
 	if err != nil {
 		return nil, err
 	}
