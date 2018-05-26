@@ -1,6 +1,8 @@
 hash: 620b830f7cd52380337a5a3853e582f8d9ff1797685db59d9bf11d59b21bd469
-updated: 2018-05-26T10:22:14.2082433+02:00
+updated: 2018-05-26T11:30:13.8792109+02:00
 imports:
+- name: github.com/dhtech/go-openurl
+  version: 518aa2d91f534045a2f19185fae16a2fa77bd0cd
 - name: github.com/golang/protobuf
   version: 3a3da3a4e26776cc22a79ef46d5d58477532dede
   subpackages:
@@ -12,7 +14,7 @@ imports:
   - ptypes/duration
   - ptypes/timestamp
 - name: github.com/lazada/grpc-ui
-  version: 1f80838d1cd598eb3ef74bca243e09152e53a211
+  version: 3a356b0d4e76a7248476bf08cefd4ad0e7dfb349
   repo: https://github.com/dhtech/grpc-ui.git
   subpackages:
   - http_server
