@@ -10,7 +10,7 @@ import (
 
 func main() {
 	var addr string
-	flag.StringVar(&addr, "addr", "", "http server listening addr")
+	flag.StringVar(&addr, "addr", "[::1]:7000", "http server listening addr")
 	flag.Parse()
 
 	if addr == "" {
