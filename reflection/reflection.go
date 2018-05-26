@@ -2,10 +2,21 @@ package reflection
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
+	"flag"
+	"log"
+	"os"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	pb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
+)
+
+var (
+	useTls      = flag.Bool("use_tls", true, "Use TLS")
+	tlsUserCert = flag.String("tls_user_crt", "$HOME/.grpc-ui/user.crt", "TLS client certificate to use")
+	tlsUserKey  = flag.String("tls_user_key", "$HOME/.grpc-ui/user.key", "TLS client certificate key to use")
 )
 
 type Reflection struct {
@@ -13,11 +24,27 @@ type Reflection struct {
 	FileDescriptors [][]byte
 }
 
+func grpcTransportCredentials() grpc.DialOption {
+	if !*useTls {
+		return grpc.WithInsecure()
+	}
+	tc := tls.Config{}
+	cert, err := tls.LoadX509KeyPair(os.ExpandEnv(*tlsUserCert), os.ExpandEnv(*tlsUserKey))
+	if err != nil {
+		log.Printf("unable to load client certificate, proceeding without")
+	} else {
+		tc.Certificates = []tls.Certificate{cert}
+	}
+	return grpc.WithTransportCredentials(
+		credentials.NewTLS(&tc),
+	)
+}
+
 func GetReflection(ctx context.Context, addr string) (*Reflection, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure())
+	conn, err := grpc.DialContext(ctx, addr, grpcTransportCredentials())
 
 	if err != nil {
 		return nil, err
@@ -129,7 +156,7 @@ func Invoke(
 	method string,
 	payload []byte,
 ) ([]byte, error) {
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure())
+	conn, err := grpc.DialContext(ctx, addr, grpcTransportCredentials())
 	if err != nil {
 		return nil, err
 	}
