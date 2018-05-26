@@ -1,4 +1,4 @@
-package: github.com/lazada/grpc-ui
+package: github.com/dhtech/grpc-ui
 import:
 - package: github.com/golang/protobuf
   subpackages:
@@ -11,3 +11,6 @@ import:
 - package: google.golang.org/grpc
   subpackages:
   - reflection/grpc_reflection_v1alpha
+- package: github.com/lazada/grpc-ui
+  repo:    https://github.com/dhtech/grpc-ui.git
+ 
